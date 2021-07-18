@@ -1,0 +1,10 @@
+server:
+  port: 7002
+eureka:
+  client:
+    register-with-eureka: false #表示自己是服务中心，不需要注册自己
+    service-url:
+    #设置与Eureka server交互的地址查询服务和注册服务都需要依赖这个地址
+      defaultZone: http://eureka7001.com:7001/eureka
+    #是否从eureka抓取已有的注册信息，默认为true
+    fetch-registry: false
