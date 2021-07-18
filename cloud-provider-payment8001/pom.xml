@@ -12,7 +12,12 @@
     <artifactId>cloud-provider-payment8001</artifactId>
 
     <dependencies>
-
+        <!--引入eureka-->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+        </dependency>
+        <!--导入公共-->
         <dependency>
             <groupId>com.cyz</groupId>
             <artifactId>cloud-api-commons</artifactId>

@@ -23,7 +23,10 @@ public class PaymentController {
 
     @Autowired
     private RestTemplate restTemplate;
+    //单点调用
     public static final String PAYMENTPATH="http://localhost:8001/provider/";
+    /*轮询调用*/
+    //public static final String PAYMENTPATH="CLOUD-PAYMENT-SERVICE";
     @ApiOperation(value="插入数据", notes="插入数据")
     @PostMapping("payment/create")
     public CommonResult create(String serial){

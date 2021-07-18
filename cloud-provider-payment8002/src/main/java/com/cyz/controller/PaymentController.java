@@ -28,7 +28,7 @@ public class PaymentController {
         int result = paymentService.create(serial);
         log.info("*********插入的结果："+result);
         if (result >0){
-            return new CommonResult(200,"插入数据库成功",result);
+            return new CommonResult(200,"插入数据库成功8002",result);
         }else {
             return new CommonResult(444,"插入数据库失败",result);
 
@@ -41,9 +41,9 @@ public class PaymentController {
         Payment payment = paymentService.getPayment(id);
         log.info("*********查询的结果："+payment);
         if (payment != null){
-            return new CommonResult(200,"查询的结果8001",payment);
+            return new CommonResult(200,"查询的结果8002",payment);
         }else {
-            return new CommonResult(444,"查询数据库失败8001");
+            return new CommonResult(444,"查询数据库失败");
         }
     }
 }
