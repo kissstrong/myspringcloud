@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cyz.dao.PaymentDao">
+      <insert id="create" parameterType="String">
+          insert into payment(serial) values(#{serial});
+      </insert>
+    <resultMap id="BaseMapper" type="Payment">
+        <id column="id" property="id" javaType="Long" jdbcType="BIGINT"></id>
+        <id column="serial" property="serial" javaType="String" jdbcType="VARCHAR"></id>
+
+    </resultMap>
+<select id="getPayment" parameterType="Long" resultMap="BaseMapper">
+    select * from payment where id = #{id}
+</select>
+</mapper>
