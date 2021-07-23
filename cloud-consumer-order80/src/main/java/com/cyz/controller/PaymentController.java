@@ -24,20 +24,20 @@ public class PaymentController {
     @Autowired
     private RestTemplate restTemplate;
     //单点调用
-    public static final String PAYMENTPATH="http://localhost:8001/provider/";
+    //public static final String PAYMENTPATH="http://localhost:8001/";
     /*轮询调用*/
-    //public static final String PAYMENTPATH="CLOUD-PAYMENT-SERVICE";
+    public static final String PAYMENTPATH="http://CLOUD-PAYMENT-SERVICE";
     @ApiOperation(value="插入数据", notes="插入数据")
     @PostMapping("payment/create")
     public CommonResult create(String serial){
-        CommonResult commonResult = restTemplate.postForObject(PAYMENTPATH + "payment/create", serial, CommonResult.class);
+        CommonResult commonResult = restTemplate.postForObject(PAYMENTPATH + "/provider/payment/create", serial, CommonResult.class);
         return commonResult;
     }
     @ApiOperation(value="查询数据", notes="查询数据")
     @GetMapping("/payment/get/{id}")
     public CommonResult getPaymentById(@PathVariable("id")Long id){
 
-        CommonResult commonResult = restTemplate.getForObject(PAYMENTPATH + "/payment/get/"+ id, CommonResult.class);
+        CommonResult commonResult = restTemplate.getForObject(PAYMENTPATH + "/provider/payment/get/"+ id, CommonResult.class);
         return commonResult;
     }
 }
