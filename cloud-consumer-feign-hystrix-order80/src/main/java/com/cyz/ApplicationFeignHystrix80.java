@@ -1,8 +1,8 @@
 package com.cyz;
-
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
+import org.springframework.cloud.netflix.hystrix.EnableHystrix;
+import org.springframework.cloud.openfeign.EnableFeignClients;
 import springfox.documentation.swagger2.annotations.EnableSwagger2;
 
 /**
@@ -10,10 +10,11 @@ import springfox.documentation.swagger2.annotations.EnableSwagger2;
  * @date 2021/7/18 0018 13:33
  */
 @SpringBootApplication
-@EnableDiscoveryClient
 @EnableSwagger2
-public class Application80 {
+@EnableFeignClients
+@EnableHystrix//开启降级配置
+public class ApplicationFeignHystrix80 {
     public static void main(String[] args) {
-        SpringApplication.run(Application80.class,args);
+        SpringApplication.run(ApplicationFeignHystrix80.class,args);
     }
 }

@@ -10,6 +10,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.concurrent.TimeUnit;
+
 /**
  * @author cyz
  * @date 2021/7/18 0018 14:08
@@ -44,6 +46,17 @@ public class PaymentController {
             return new CommonResult(200,"查询的结果8002",payment);
         }else {
             return new CommonResult(444,"查询数据库失败");
+        }
+    }
+    @ApiOperation(value="测试feign的超时", notes="测试feign的超时")
+    @GetMapping("/provider/payment/feign")
+    public String getPaymentById(){
+        try {
+            TimeUnit.SECONDS.sleep(3);
+        }catch (Exception e){
+            throw new RuntimeException(e);
+        }finally {
+            return "8001";
         }
     }
 }
