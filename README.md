@@ -545,5 +545,43 @@ public interface PaymentFeignService {
 2∶请求总数阀值:在快照时间窗内，必须满足请求总数阀值才有资格熔断。默认为20，意味着在10秒内，如果该hystrix命令的调用次数不足20次,即使所有的请求都超时或其他原因失败，断路器都不会打开。
 3:错误百分比阀值:当请求总数在快照时间窗内超过了阀值，比如发生了30次调用，如果在这30次调用中，有15次发生了超时异常，也就是超过50%的错误百分比，在默认设定50%阀值情况下，这时候就会将断路器打开。
 
+***hystrix服务监控（可视化界面）***
+建立新模块cloud-sonsumer-hystrix-dashboard9001 
+导入依赖:（需要监控的模块都要导入spring-boot-starter-actuator依赖才行）
+```xml
+ <!--引入hystrix-dashboard-->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-netflix-hystrix-dashboard</artifactId>
+        </dependency>
+<!--可视化-->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+```
+启动类上加上注解@EnableHystrixDashboard开启监控，启动服务器，访问地址是：
+http://localhost:9001/hystrix 出现一个可视化界面即操作成功
 
+**使用**
+在使用hystrix的模块里面的启动类里面加入bean（不要问为什么）
+```java
+
+    /*此配置是为了服务监控而配置，与服务容错本身无关，
+    springcLoud升级后的玩IServletRegistrationBean
+    因为springboot的默认路径不是"/hystrix.stream"，
+    只要在自己的项目里配置上下面的servlet就可以了
+    */
+    @Bean
+    public ServletRegistrationBean getservlet() {
+        HystrixMetricsStreamServlet streamServlet = new HystrixMetricsStreamServlet();
+        ServletRegistrationBean registrationBean = new ServletRegistrationBean(streamServlet);
+        registrationBean.setLoadOnStartup(1);
+        registrationBean.addUrlMappings( "/hystrix.stream" ) ;
+        registrationBean. setName("HystrixMetricsStreamServlet");
+        return registrationBean;
+    }
+```
+这个一定要引入spring-boot-starter-actuator才行，访问该服务使用熔断器的请求，然后再9001监控页面输入
+http://localhost:8001/hystrix.stream即可查看访问情况
 #spring cloud Alibaba
