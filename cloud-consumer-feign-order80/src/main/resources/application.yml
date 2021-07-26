@@ -1,0 +1,23 @@
+server:
+  port: 80
+spring:
+  application:
+    name: cloud-payment-feign-consumer
+eureka:
+  client:
+    register-with-eureka: true #false表示自己是服务中心，不需要注册自己
+    service-url:
+    #设置与Eureka server交互的地址查询服务和注册服务都需要依赖这个地址
+      #defaultZone: http://localhost:7001/eureka
+      defaultZone: http://eureka7001.com:7001/eureka,http://eureka7002.com:7002/eureka #集群版
+    fetch-registry: true
+#设置feign客户端超时时间
+ribbon:
+  #指定建立连接时间
+  ReadTimeout: 5000
+  #指定读取服务的时间
+  ConnectTimeout: 5000
+#feign的日志增强
+logging:
+  level: #下面写的是feign的接口位置
+    com.cyz.service.PaymentFeignService: debug
