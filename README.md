@@ -583,5 +583,125 @@ http://localhost:9001/hystrix 出现一个可视化界面即操作成功
     }
 ```
 这个一定要引入spring-boot-starter-actuator才行，访问该服务使用熔断器的请求，然后再9001监控页面输入
-http://localhost:8001/hystrix.stream即可查看访问情况
+http://localhost:8001/hystrix.stream即可查看访问
+
+##gateway
+Gateway是在Spring生态系统之上构建的API网关服务，基于Spring 5,Spring
+Boot 2和Project Reactor等技术。
+Gateway旨在提供一种简单而有效的方式来对API进行路由，以及提供一些强大的过滤器功能，例如:熔断、限流、重试等
+
+SpringCloud Gateway使用的Webflux中的reactor-netty响应式编程组件，底层使用了Netty通讯框架。
+可以做：反向代理 鉴权  流量控制  熔断 日志监控
+
+三大核心概念：
+Route(路由)
+  路由是构建网关的基本模块，它由ID，目标URI，一系列的断言和过滤器组成，如果断言为true则匹配该路由
+Predicate(断言)
+  参考的是Java8的java.util.function.Predicate，开发人员可以匹配HTTP请求中的所有内容(例如请求头或请求参数)，如果请求与断言相匹配则进行路由
+Filter(过滤）
+  指的是Spring框架中GatewayFilter的实例，使用过滤器，可以在请求被路由前或者之后对请求进行修改。
+核心逻辑
+路由转发+执行过滤器链
+***使用***
+建立cloud-gateway-gateway9527模块，导入依赖（不要导入web 和actuator）
+```xml
+<dependencies>
+        <!--gateway-->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-gateway</artifactId>
+        </dependency>
+        <!--引入eureka-->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+   ```
+写配置：
+```yaml
+server:
+  port: 9527
+spring:
+  application:
+    name: cloud-gateway
+  cloud:
+    gateway:
+      routes:
+        - id: payment_routh #路由的ID，没有固定规则但要求唯一，建议配合服务名
+          uri: http://localhost:8001 #匹配后提供服务的路由地址
+          predicates:
+            - Path=/payment/get/** #断言，路径相匹配的进行路由
+
+        - id: payment_routh2 #路由的ID，没有固定规则但要求唯一，建议配合服务名
+          uri: http://localhost:8001 #匹配后提供服务的路由地址
+          predicates:
+            - Path=/payment/lb/** #断言，路径相匹配的进行路由
+
+eureka:
+  client:
+    register-with-eureka: true #false表示自己是服务中心，不需要注册自己
+    service-url:
+      #设置与Eureka server交互的地址查询服务和注册服务都需要依赖这个地址
+      defaultZone: http://localhost:7001/eureka
+      #defaultZone: http://eureka7001.com:7001/eureka,http://eureka7002.com:7002/eureka #集群版
+    fetch-registry: true
+  instance:
+    hostname: cloud-gateway-service
+```
+写启动类
+```java
+@SpringBootApplication
+@EnableEurekaClient
+public class GatewayApplication9527 {
+    public static void main(String[] args) {
+        SpringApplication.run(GatewayApplication9527.class,args);
+    }
+}
+```
+###测试：
+在cloud-provider-payment8001的controller里面加入两个请求
+```java
+
+    @ApiOperation(value="测试payment/get/{id}", notes="测试feign的超时")
+    @GetMapping("/payment/get/{id}")
+    public String payment(@PathVariable String id){
+       return "8001get"+id;
+    }
+    @ApiOperation(value="测试payment/lb", notes="测试payment/lb")
+    @GetMapping("/payment/lb/{id}")
+    public String payment1(@PathVariable String id){
+        return "8001lb"+id;
+    }
+
+```
+启动7001 8001 9527 ，使用http://localhost:9527/payment/lb/1访问就会调用lb的请求
+http://localhost:9527/payment/get/1就会调用get的请求，就会隐藏掉8001端口
+配置路由两种方式：
+ - 在yml中配置，如上
+ - 在代码中注入RouteLocator的bean 如下
+写一个配置：
+```java
+@Configuration
+public class GatewayConfig {
+
+    @Bean
+    public RouteLocator getMyGateway(RouteLocatorBuilder routeLocatorBuilder){
+        //这边获得的routes就类似于配置文件那边的routes
+        RouteLocatorBuilder.Builder routes = routeLocatorBuilder.routes();
+        //https://news.baidu.com/guonei 访问国内新闻试试
+         //这里的id和yml中的id类似 patterns类似于yml中的predicates断言  uri就类似于yml中的uri
+        //整体就是访问9527的guonei，就会访问https://news.baidu.com/guonei
+        routes.route("com_cyz",r->r.path("/guonei").uri("https://news.baidu.com/guonei")).build();
+
+        return routes.build();
+    }
+}
+```
+
 #spring cloud Alibaba

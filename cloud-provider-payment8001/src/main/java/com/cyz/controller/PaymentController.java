@@ -61,4 +61,18 @@ public class PaymentController {
         }
     }
 
+
+    @ApiOperation(value="测试payment/get/{id}", notes="测试feign的超时")
+    @GetMapping("/payment/get/{id}")
+    public String payment(@PathVariable String id){
+       return "8001get"+id;
+    }
+    @ApiOperation(value="测试payment/lb", notes="测试payment/lb")
+    @GetMapping("/payment/lb/{id}")
+    public String payment1(@PathVariable String id){
+        return "8001lb"+id;
+    }
+
+
+
 }
