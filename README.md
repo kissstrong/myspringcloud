@@ -185,7 +185,10 @@ List<ServiceInstance> instances = discoveryClient.getInstances("CLOUD-PAYMENT-SE
 当总请求数位3时:3%2=1对应下标位置为1，则获得服务地址为127.0.0.1:8001
 当总请求数位4时:4%2=О对应下标位置为0，则获得服务地址为127.0.0.1:8002
 如此类推.....
-##openFeign
+## 服务调度
+
+###openFeign
+
 Feign能于什么
 
 Feign旨在使编写Java Http客户端变得更容易。
@@ -305,7 +308,8 @@ Hystrix是一个用于处理分布式系统的延迟和容错的开源库，在�
 ####服务限流
 秒杀高并发等操作，严禁一窝蜂的过来拥挤，大家排队，一秒钟N个，有序进行
 
-####新建服务模块cloud-provider-hystrix-payment8001
+新建服务模块cloud-provider-hystrix-payment8001
+
 引入hystrix依赖
 ```xml
 <!--引入hystrix-->
@@ -362,7 +366,7 @@ public class PaymentController {
 对方服务(8001)OK，调用者(80)自己出故障或有自我要求(自己的等待时间小于服务提供者)
 
 ***降级配置：*** 
-   
+
 先从8001自身找办法 设置自身调用超时时间的峰值，峰值内可以正常运行，超过了需要有兜底的方法处理，作服务降级fallback
 方法一:在8001里面降级
 
@@ -585,7 +589,10 @@ http://localhost:9001/hystrix 出现一个可视化界面即操作成功
 这个一定要引入spring-boot-starter-actuator才行，访问该服务使用熔断器的请求，然后再9001监控页面输入
 http://localhost:8001/hystrix.stream即可查看访问
 
-##gateway
+## 网关
+
+###gateway
+
 Gateway是在Spring生态系统之上构建的API网关服务，基于Spring 5,Spring
 Boot 2和Project Reactor等技术。
 Gateway旨在提供一种简单而有效的方式来对API进行路由，以及提供一些强大的过滤器功能，例如:熔断、限流、重试等
@@ -622,7 +629,7 @@ Filter(过滤）
             <scope>test</scope>
         </dependency>
     </dependencies>
-   ```
+```
 写配置：
 ```yaml
 server:
@@ -664,7 +671,8 @@ public class GatewayApplication9527 {
     }
 }
 ```
-###测试：
+*** 测试 **
+
 在cloud-provider-payment8001的controller里面加入两个请求
 ```java
 
@@ -685,7 +693,7 @@ http://localhost:9527/payment/get/1就会调用get的请求，就会隐藏掉800
 配置路由两种方式：
  - 在yml中配置，如上
  - 在代码中注入RouteLocator的bean 如下
-写一个配置：
+  写一个配置：
 ```java
 @Configuration
 public class GatewayConfig {
@@ -703,5 +711,398 @@ public class GatewayConfig {
     }
 }
 ```
+***集群网关路由***
+写服务名，调用服务
+```yml
+spring:
+  application:
+    name: cloud-gateway
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: true #开启从注册中心动态创建路由功能，利用微服务名进行路由
+      routes:
+        - id: payment_routh #路由的ID，没有固定规则但要求唯一，建议配合服务名
+          #uri: http://localhost:8001 #匹配后提供服务的路由地址 写死的
+          uri: lb://CLOUD-PAYMENT-SERVICE #匹配后提供服务的路由地址  路由的 这边的lb可以理解为loadbalance
+          predicates:
+            - Path=/payment/get/** #断言，路径相匹配的进行路由
 
+        - id: payment_routh2 #路由的ID，没有固定规则但要求唯一，建议配合服务名
+          #uri: http://localhost:8001 #匹配后提供服务的路由地址
+          uri: lb://CLOUD-PAYMENT-SERVICE #匹配后提供服务的路由地址 路由的 这边的lb可以理解为loadbalance
+          predicates:
+            - Path=/payment/hh/** #断言，路径相匹配的进行路由
+```
+断言的多种方式，在控制台有输出
+```shell
+Loaded RoutePredicateFactory [After]
+Loaded RoutePredicateFactory [Before]
+Loaded RoutePredicateFactory [Between]
+Loaded RoutePredicateFactory [Cookie]
+Loaded RoutePredicateFactory [Header]
+Loaded RoutePredicateFactory [Host]
+Loaded RoutePredicateFactory [Method]
+Loaded RoutePredicateFactory [Path]
+Loaded RoutePredicateFactory [Query]
+Loaded RoutePredicateFactory [ReadBodyPredicateFactory]
+Loaded RoutePredicateFactory [RemoteAddr]
+Loaded RoutePredicateFactory [Weight]
+Loaded RoutePredicateFactory [CloudFoundryRouteService]
+```
+常用的有如下几种：
+1.After Route Predicate 在这个时间之后起作用
+2.Before Route Predicate 在这个时间之前起作用
+3.Between Route Predicate
+4.Cookie Route Predicate
+5.Header Route Predicate
+6. Host Route Predicate
+  7.Method Route Predicate
+  8.Path Route Predicate
+  9.Query Route Predicate
+  总结：说白了，Predicate就是为了实现一组匹配规则，让请求过来找到对应的Route进行处理。
+```yml
+ - id: payment_routh2 #路由的ID，没有固定规则但要求唯一，建议配合服务名
+          #uri: http://localhost:8001 #匹配后提供服务的路由地址
+          uri: lb://CLOUD-PAYMENT-SERVICE #匹配后提供服务的路由地址 路由的 这边的lb可以理解为loadbalance
+          predicates:
+            - Path=/payment/hh/** #断言，路径相匹配的进行路由
+            #- After=2021-07-30T10:48:39.219+08:00[Asia/Shanghai] #通过这个获取 ZonedDateTime now = ZonedDateTime.now();
+            #- Before=2021-07-30T10:48:39.219+08:00[Asia/Shanghai]
+            #- Between=2021-07-30T10:48:39.219+08:00[Asia/Shanghai],2021-07-30T10:49:39.219+08:00[Asia/Shanghai]
+            #- Cookie=username,cyz #带Cookie 且key有username value 是cyz
+            #- Header=X-Request-Id, \d+   #两个参数:一个是属性名称和一个正则表达式，这个属性值和正则表达式匹配则执行。header中要有 X-Request-Id属性，且为整数
+            #- Host=**.cyz.com  #请求头要带**.cyz.com才行
+            #- Method=GET #GET请求才可以
+            #- Query=username, \d+ #参数要有username 且值为整数
+```
+***过滤器***
+官网使用的太为繁琐，一般使用自定义过滤器，只需要实现两个接口即可GlobalFilter, Ordered,可以配置多个
+```java
+@Component
+public class MyLogGatewayFilter implements GlobalFilter, Ordered {
+    @Override
+    public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+        String uname = exchange.getRequest().getQueryParams().getFirst("uname");
+        if (uname==null){ //判断是否有uname参数
+            exchange.getResponse().setStatusCode(HttpStatus.NOT_ACCEPTABLE);
+            System.out.println("没有携带uname");
+            return exchange.getResponse().setComplete();
+        }
+        System.out.println("携带uname");
+        return chain.filter(exchange);
+    }
+//下面这个是顺序，0代表优先级，范围int  -2147483648  -- 2147483647;
+    @Override
+    public int getOrder() {
+        return 0;
+    }
+}
+
+http://localhost:9527/payment/hh/1?uname=123132
+```
+## 配置
+
+###springcloudconfig
+
+是什么：
+   SpringCloud Config为微服务架构中的微服务提供集中化的外部配置支持，配置服务器为各个不同微服务应用的所有环境提供了一个中心化的外部配置。
+怎么玩：
+  SpringCloud Config分为服务端和客户端两部分。
+  服务端也称为分布式配置中心，它是一个独立的微服务应用，用来连接配置服务器并为客户端提供获取配置信息，加密/解密信息等访问接口
+  客户端则是通过指定的配置中心来管理应用资源，以及与业务相关的配置内容，并在启动的时候从配置中心获取和加载配置信息配置服务器默认采用git来存储配置信息，这样就有助于对环境配置进行版本管理，并且可以通过git客户端工具来方便的管理和访问配置内容
+干什么：
+  集中管理配置文件
+  不同环境不同配置，动态化的配置更新，分环境部署比如dev/test/prod/beta/release
+  运行期间动态调整配置，不再需要在每个服务部署的机器上编写配置文件，服务会向配置中心统一拉取配置自己的信息
+  当配置发生变动时，服务不需要重启即可感知到配置的变化并应用新的配置
+  将配置信息以REST接口的形式暴露
+
+***具体使用***
+先在github上面创建仓库 springcloud-config 里面加入三个yml
+config-dev.yml
+config-prod.yml
+config-test.yml
+创建服务端：cloud-config-center-3344模块 
+导入依赖 spring-cloud-config-server
+```xml
+<dependencies>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-config-server</artifactId>
+        </dependency>
+        <!--引入eureka-->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+    </dependencies>
+```
+写配置：
+```yml
+server:
+  port: 3344
+spring:
+  application:
+    name: cloud-config-center
+  cloud:
+    config:
+      server:
+        git:
+          uri: https://github.com/kissstrong/springcloud-config.git #github上面的地址
+          #搜索目录
+          search-paths:
+            - springcloud-config
+      #读取的分支
+      label: master
+
+eureka:
+  client:
+    register-with-eureka: true #false表示自己是服务中心，不需要注册自己
+    service-url:
+      #设置与Eureka server交互的地址查询服务和注册服务都需要依赖这个地址
+      defaultZone: http://eureka7001.com:7001/eureka #单机版
+      #集群版本
+      #defaultZone: http://eureka7001.com:7001/eureka,http://eureka7002.com:7002/eureka #集群版
+config:
+  name: cyz
+```
+写启动类
+
+````java
+@SpringBootApplication
+@EnableConfigServer
+public class ConfigCenter3344 {
+    public static void main(String[] args) {
+        SpringApplication.run(ConfigCenter3344.class,args);
+    }
+}
+````
+测试启动7001 3344 访问
+http://localhost:3344/master/config-dev.yml
+http://localhost:3344/master/config-prod.yml
+http://localhost:3344/master/config-test.yml
+都可以访问到对应的yml
+
+读取策略：
+/{label}/{application}-{profile}.yml 读取对应分支下的对应yml
+http://localhost:3344/master/config-test.yml
+/{application}-{profile}.yml  读取在application.yml中配置的label即master下的yml
+http://localhost:3344/config-test.yml
+/{application}/profile}/{label}
+http://localhost:3344/config/test/master
+创建客户端：cloud-config-client-3355 
+了解：
+  applicaiton.yml是用户级的资源配置项
+  bootstrap.yml是系统级的，优先级更加高
+  Spring Cloud会创建一个“Bootstrap context”，作为Spring应用的`Application Context的父上下文。初始化的时候，‘BootstrapContext`负责从外部源加载配置属性并解析配置。这两个上下文共享一个从外部获取的Environment'
+  Bootstrap`属性有高优先级，默认情况下，它们不会被本地配置覆盖。`Bootstrap context和Application Context有着不同的约定，所以新增了一个'bootstrap.yml'文件，保证`Bootstrap Context`和`Application Context`配置的分离。
+  要将Client模块下的application.yml文件改为bootstrap.yml,这是很关键的，
+  因为bootstrap.yml是比application.yml先加载的。bootstrap.yml优先级高于application.yml
+导依赖：
+```xml
+<dependencies>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-config</artifactId>
+        </dependency>
+        <!--引入eureka-->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+    </dependencies>
+```
+写配置bootstrap.yml
+```yml
+server:
+  port: 3355
+spring:
+  application:
+    name: cloud-config-client
+  cloud:
+    #config客户端配置
+    config:
+      label: master #分支名
+      name: config #读取的配置文件名
+      profile: dev #后缀名称
+      uri: http://localhost:3344 #配置中心地址
+
+eureka:
+  client:
+    register-with-eureka: true #false表示自己是服务中心，不需要注册自己
+    service-url:
+      #设置与Eureka server交互的地址查询服务和注册服务都需要依赖这个地址
+      defaultZone: http://eureka7001.com:7001/eureka #单机版
+      #集群版本
+      #defaultZone: http://eureka7001.com:7001/eureka,http://eureka7002.com:7002/eureka #集群版
+```
+启动类：
+```java
+@SpringBootApplication
+@EnableEurekaClient
+public class ConfigClient3355 {
+    public static void main(String[] args) {
+        SpringApplication.run(ConfigClient3355.class,args);
+    }
+}
+```
+controller:
+```java
+@RestController
+public class TestConfigController {
+
+    @Value("${config.name}")
+    private String name;
+
+    @RequestMapping("getname")
+    private String get(){
+        return name;
+    }
+}
+
+```
+测试：启动7001 3344 3355 访问http://localhost:3355/getname 看能否得到值
+
+***配置刷新问题***
+服务端可以动态刷新，客户端不可以
+解决办法：
+在客户端的bootstrap.yml里面加入配置，暴露端点（前提要引入spring-boot-starter-actuator）
+```yml
+#暴露监控端点
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+```
+加上@RefreshScope注解，目前只支持在bean上加，不知道为啥，对应的controller也改变
+
+```java
+@Component
+@RefreshScope
+public class User {
+    @Value("${config.name}")
+    private String name;
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+
+```
+````java
+@RestController
+public class TestConfigController {
+
+    @Autowired
+    private User user;
+
+    @RequestMapping("getname")
+    private String get(){
+        return user.getName();
+    }
+}
+````
+测试，访问http://localhost:3355/getname  
+修改GitHub上配置文件的值，然后再发一个请求刷新一下即可http://localhost:3355/actuator/refresh  的post请求
+在访问http://localhost:3355/getname 发现值已经刷新
+## 技术总线
+
+###springcloud bus
+
+分布式自动刷新配置功能
+Spring Cloud Bus配合Spring Cloud Config使用可以实现配置的动态刷新。
+Bus支持两种消息代理: RabbitMQ和Kafka
+
+什么是总线
+  在微服务架构的系统中，通常会使用轻量级的消息代理来构建一个共用的消息主题，并让系统中所有微服务实例都连接上来。
+  由于该主题中产生的消息会被所有实例监听和消费，所以称它为消息总线。
+  在总线上的各个实例，都可以方便地广播━些需要让其他连接在该主题上的实例都知道的消息。
+基本原理
+  ConfigClient实例都监听MQ中同一个topic(默认是springCloudBus)。
+  当一个服务刷新数据的时候，它会把这个信息放入到Topic中，这样其它监听同一Topic的服务就能得到通知，然后去更新自身的配置。
+
+设计思想:
+1)利用消息总线触发一个客户端/bus/refresh,而划新所有客户端的配置
+2)利用消息总线触发一个服务端ConfigServer的/bus/refresh端点，而刷新所有客户端的配置
+具体使用：再创建一个cloud-config-client-3366和3355一模一样
+加入bus使用
+在服务端3344里面 加入依赖
+```xml
+ <!--添加消息总线RabbitMQ支持-->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-bus-amqp</artifactId>
+        </dependency>
+```
+加入配置
+```yml
+spring:
+  #添加rabbitMQ配置
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "bus-refresh"
+
+```
+在客户端3355 3366里面加入依赖
+````xml
+ <!--添加消息总线RabbitMQ支持-->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-bus-amqp</artifactId>
+        </dependency>
+````
+加入配置：
+```yml
+spring:
+  #添加rabbitMQ配置
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+```
+测试：依次启动7001 3344 3355 3366 
+浏览器输入
+http://localhost:3344/master/config-dev.yml
+http://localhost:3355/getname
+http://localhost:3366/getname
+都可以取到值
+修改github上的配置文件，刷新3344有效刷新数据，3355 3366没有刷新
+执行http://localhost:3344/actuator/bus-refresh的post请求后，3355 3366全部刷新
+一句话：—次修改，广播通知，处处生效
+定点刷新，例如只刷新3355 不刷新3366
+   http://服务注册中心ip:端口/actuator/bus-refresh/服务名:端口即可
+   http://localhost:3344/actuator/bus-refresh/cloud-config-client:3355
 #spring cloud Alibaba
