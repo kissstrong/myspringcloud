@@ -68,9 +68,9 @@ public class PaymentController {
        return "8001get"+id;
     }
     @ApiOperation(value="测试payment/lb", notes="测试payment/lb")
-    @GetMapping("/payment/lb/{id}")
+    @GetMapping("/payment/hh/{id}")
     public String payment1(@PathVariable String id){
-        return "8001lb"+id;
+        return "8001hh"+id;
     }
 
 

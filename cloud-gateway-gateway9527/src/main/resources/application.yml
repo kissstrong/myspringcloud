@@ -5,16 +5,30 @@ spring:
     name: cloud-gateway
   cloud:
     gateway:
+      discovery:
+        locator:
+          enabled: true #开启从注册中心动态创建路由功能，利用微服务名进行路由
       routes:
         - id: payment_routh #路由的ID，没有固定规则但要求唯一，建议配合服务名
-          uri: http://localhost:8001 #匹配后提供服务的路由地址
+          #uri: http://localhost:8001 #匹配后提供服务的路由地址 写死的
+          uri: lb://CLOUD-PAYMENT-SERVICE #匹配后提供服务的路由地址  路由的 这边的lb可以理解为loadbalance
           predicates:
             - Path=/payment/get/** #断言，路径相匹配的进行路由
 
         - id: payment_routh2 #路由的ID，没有固定规则但要求唯一，建议配合服务名
-          uri: http://localhost:8001 #匹配后提供服务的路由地址
+          #uri: http://localhost:8001 #匹配后提供服务的路由地址
+          uri: lb://CLOUD-PAYMENT-SERVICE #匹配后提供服务的路由地址 路由的 这边的lb可以理解为loadbalance
           predicates:
-            - Path=/payment/lb/** #断言，路径相匹配的进行路由
+            - Path=/payment/hh/** #断言，路径相匹配的进行路由
+            #- After=2021-07-30T10:48:39.219+08:00[Asia/Shanghai] #通过这个获取 ZonedDateTime now = ZonedDateTime.now();
+            #- Before=2021-07-30T10:48:39.219+08:00[Asia/Shanghai]
+            #- Between=2021-07-30T10:48:39.219+08:00[Asia/Shanghai],2021-07-30T10:49:39.219+08:00[Asia/Shanghai]
+            #- Cookie=username,cyz #带Cookie 且key有username value 是cyz
+            #- Header=X-Request-Id, \d+   #两个参数:一个是属性名称和一个正则表达式，这个属性值和正则表达式匹配则执行。header中要有 X-Request-Id属性，且为整数
+            #- Host=**.cyz.com  #请求头要带**.cyz.com才行
+            #- Method=GET #GET请求才可以
+            #- Query=username, \d+ #参数要有username 且值为整数
+
 
 eureka:
   client:
