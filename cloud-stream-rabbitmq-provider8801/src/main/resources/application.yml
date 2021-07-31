@@ -1,23 +1,25 @@
 server:
-  port: 8001
+  port: 8801
 spring:
   application:
-    name: cloud-payment-service
-  zipkin:
-    base-url: http://localhost:9411
-  sleuth:
-    sampler:
-      #采样率值介于0到1之间 1表示100%
-      probability: 1
-  datasource:
-    type: com.alibaba.druid.pool.DruidDataSource
-    driver-class-name: org.gjt.mm.mysql.Driver
-    url: jdbc:mysql://localhost:3306/myspringcloud?serverTimezone=UTC&useUnicode=true&amp&characterEncoding=utf-8
-    username: root
-    password: 123456
-mybatis:
-  mapper-locations: classpath:mapper/*.xml
-  type-aliases-package: com.cyz.bean
+    name: cloud-stream-provider
+  cloud:
+    stream:
+      binders: #在此处配置要绑定的rabbitmq的服务信息;
+        defaultRabbit: #表示定义的名称，用于于binding整合
+          type: rabbit #消息组件类型
+          environment: #设置rabbitmq的相关的环境配置
+             spring:
+               rabbitmq:
+                 host: localhost
+                 port: 5672
+                 username: guest
+                 password: guest
+      bindings: #服务的整合处理
+        output: #这个名字是一个通道的名称
+          destination: studyExchange #表示要使用的Exchange名称定义
+          content-type: application/json #设置消息类型，本次为json，文本则设置"text/plain"
+          binder: defaultRabbit #设置要绑定的消息服务的具体设置
 
 eureka:
   client:

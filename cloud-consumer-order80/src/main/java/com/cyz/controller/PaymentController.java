@@ -40,4 +40,10 @@ public class PaymentController {
         CommonResult commonResult = restTemplate.getForObject(PAYMENTPATH + "/provider/payment/get/"+ id, CommonResult.class);
         return commonResult;
     }
+
+    @ApiOperation(value="查询testzipkin数据", notes="查询testzipkin数据")
+    @GetMapping("/testzipkin")
+    public String testzipkin(){
+        return restTemplate.getForObject(PAYMENTPATH + "/testzipkin/", String.class);
+    }
 }
