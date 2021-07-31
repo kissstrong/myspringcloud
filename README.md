@@ -1105,4 +1105,318 @@ http://localhost:3366/getname
 定点刷新，例如只刷新3355 不刷新3366
    http://服务注册中心ip:端口/actuator/bus-refresh/服务名:端口即可
    http://localhost:3344/actuator/bus-refresh/cloud-config-client:3355
+##消息驱动
+###SpringCloudStream
+什么是SpringCloudStream
+官方定义Spring Cloud Stream是一个构建消息驱动微服务的框架。
+应用程序通过inguts或者 outputs来与Spring Cloud Stream中binder对象交互。
+通过我们配置来binding(绑定)，而Spring Cloud Stream的 binder对象负责与消息中间件交互。所以，我们只需要搞清楚如何与Spring Cloud Stream交互就可以方便使用消息驱动的方式。
+通过使用Spring Integration来连接消息代理中间件以实现消息事件驱动。
+Spring Cloud Stream为一些供应商的消息中间件产品提供了个性化的自动化配置实现,
+引用了发布-订阅、消费组、分区的三个核心概念。
+目前仅支持RabbitMQ、Kafka。
+一句话：屏蔽底层消息中间件的差异,降低切换成本，统一消息的编程模型
+***为什么可以屏蔽差异***
+在没有绑定器这个概念的情况下，我们的SpringBoot应用要直接与消息中间件进行信息交互的时候，由于各消息中间件构建的初衷不同，它们的实现细节上会有较大的差异性
+通过定义绑定器作为中间层，完美地实现了应用程序与消息中间件细节之间的隔离。
+通过向应用程序暴露统一的Channel通道，使得应用程序不需要再考虑各种不同的消息中间件实现。
+***通过定义绑定器Binder作为中间层，实现了应用程序与消息中间件细节之间的隔离。***
+  Binder（类似于JDBC）
+    INPUT对应于消费者
+    OUTPUT对应于生产者 
+
+Middleware：  中间件，目前只支持RabbitMQ和Kafka
+Binder： Binder是应用与消息中间件之间的封装，目前实行了Kafka和RabbitMQ的Binder，
+通过  Binder可以很方便的连接中间件，可以动态的改变消息类型(对应于Kafka的topic,RabbitMQ的exchange)，这些都可以通过配置文件来实现             |
+@Input： 注解标识输入通道，通过该输入通道接收到的消息进入应用程序                
+@Output： 注解标识输出通道，发布的消息将通过该通道离开应用程序  
+@StreamListener： 监听队列，用于消费者的队列的消息接收         
+@EnableBinding： 指信道channel和exchange绑定在一起                   |
+###入门：
+建立cloud-stream-rabbitmq-provider8801提供者
+导入依赖：
+```xml
+    <dependencies>
+        <!--引入stream-rabbit-->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-stream-rabbit</artifactId>
+        </dependency>
+
+        <!--引入eureka-->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+    </dependencies>
+```
+写配置：
+```yaml
+server:
+  port: 8801
+spring:
+  application:
+    name: cloud-stream-provider
+  cloud:
+    stream:
+      binders: #在此处配置要绑定的rabbitmq的服务信息;
+        defaultRabbit: #表示定义的名称，用于于binding整合
+          type: rabbit #消息组件类型
+          environment: #设置rabbitmq的相关的环境配置
+             spring:
+               rabbitmq:
+                 host: localhost
+                 port: 5672
+                 username: guest
+                 password: guest
+      bindings: #服务的整合处理
+        output: #这个名字是一个通道的名称
+          destination: studyExchange #表示要使用的Exchange名称定义
+          content-type: application/json #设置消息类型，本次为json，文本则设置"text/plain"
+          binder: defaultRabbit #设置要绑定的消息服务的具体设置
+
+eureka:
+  client:
+    register-with-eureka: true #false表示自己是服务中心，不需要注册自己
+    service-url:
+    #设置与Eureka server交互的地址查询服务和注册服务都需要依赖这个地址
+      defaultZone: http://eureka7001.com:7001/eureka #单机版
+      #集群版本
+      #defaultZone: http://eureka7001.com:7001/eureka,http://eureka7002.com:7002/eureka #集群版
+    fetch-registry: false
+  instance:
+    instance-id: payment8001 #配置这个就会在eureka上显示该名称
+    prefer-ip-address: true #配置了这个在eureka上鼠标放上去就会显示IP
+    #lease-expiration-duration-in-seconds: 2  #服务端接受最后一次发送心跳等待时间，超时剔除 默认90秒
+    #lease-renewal-interval-in-seconds: 1 #客户端向服务端发送请求时间间隔 默认30秒
+
+```
+写业务类：
+```java
+public interface ImessageProvider {
+    public String send();
+}
+
+```
+包不要导错了
+```java
+package com.cyz.service.impl;
+
+import com.cyz.service.ImessageProvider;
+import org.springframework.cloud.stream.annotation.EnableBinding;
+import org.springframework.cloud.stream.messaging.Source;
+import org.springframework.messaging.MessageChannel;
+import org.springframework.messaging.support.MessageBuilder;
+
+import javax.annotation.Resource;
+import java.util.UUID;
+
+/**
+ * @author cyz
+ * @date 2021/7/31 0031 15:38
+ */
+@EnableBinding(Source.class)//定义消息的推送管道
+public class ImessageProviderImpl implements ImessageProvider {
+
+    @Resource
+    private MessageChannel output;//消息发送管道
+
+    @Override
+    public String send() {
+        String serial = UUID.randomUUID().toString();
+        output.send(MessageBuilder.withPayload(serial).build());
+        System.out.println("serial:"+serial);
+        return null;
+    }
+}
+```
+controller：
+```java
+@RestController
+public class SendMessageController {
+
+    @Resource
+    private ImessageProvider imessageProvider;
+    @GetMapping("/sendMessage")
+    public String sendMessage(){
+        return imessageProvider.send();
+    }
+}
+
+```
+启动类
+```java
+@SpringBootApplication
+public class StreamApplication8801 {
+    public static void main(String[] args) {
+        SpringApplication.run(StreamApplication8801.class,args);
+    }
+}
+```
+测试：启动7001 rabbitmq  8801 访问http://localhost:8801/sendMessage 控制台有输出即提供者创建成功
+建立cloud-stream-rabbitmq-consumer8802消费者
+导入依赖：
+```xml
+    <dependencies>
+        <!--引入stream-rabbit-->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-stream-rabbit</artifactId>
+        </dependency>
+
+        <!--引入eureka-->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+    </dependencies>
+```
+写配置：区别就在output和input
+```yaml
+server:
+  port: 8801
+spring:
+  application:
+    name: cloud-stream-provider
+  cloud:
+    stream:
+      binders: #在此处配置要绑定的rabbitmq的服务信息;
+        defaultRabbit: #表示定义的名称，用于于binding整合
+          type: rabbit #消息组件类型
+          environment: #设置rabbitmq的相关的环境配置
+             spring:
+               rabbitmq:
+                 host: localhost
+                 port: 5672
+                 username: guest
+                 password: guest
+      bindings: #服务的整合处理
+        input: #这个名字是一个通道的名称
+          destination: studyExchange #表示要使用的Exchange名称定义
+          content-type: application/json #设置消息类型，本次为json，文本则设置"text/plain"
+          binder: defaultRabbit #设置要绑定的消息服务的具体设置
+
+eureka:
+  client:
+    register-with-eureka: true #false表示自己是服务中心，不需要注册自己
+    service-url:
+    #设置与Eureka server交互的地址查询服务和注册服务都需要依赖这个地址
+      defaultZone: http://eureka7001.com:7001/eureka #单机版
+      #集群版本
+      #defaultZone: http://eureka7001.com:7001/eureka,http://eureka7002.com:7002/eureka #集群版
+    fetch-registry: false
+  instance:
+    instance-id: payment8001 #配置这个就会在eureka上显示该名称
+    prefer-ip-address: true #配置了这个在eureka上鼠标放上去就会显示IP
+    #lease-expiration-duration-in-seconds: 2  #服务端接受最后一次发送心跳等待时间，超时剔除 默认90秒
+    #lease-renewal-interval-in-seconds: 1 #客户端向服务端发送请求时间间隔 默认30秒
+
+```
+controller：
+```java
+package com.cyz.controller;
+
+import org.springframework.cloud.stream.annotation.EnableBinding;
+import org.springframework.cloud.stream.annotation.StreamListener;
+import org.springframework.cloud.stream.messaging.Sink;
+import org.springframework.messaging.Message;
+import org.springframework.stereotype.Component;
+
+/**
+ * @author cyz
+ * @date 2021/7/31 0031 16:11
+ */
+@Component
+@EnableBinding(Sink.class)//标注为接受
+public class ReceiveMessageListenerController {
+
+    @StreamListener(Sink.INPUT)
+    public void input(Message<String> message){
+        System.out.println("消息："+message.getPayload()+8802);
+    }
+}
+```
+启动类
+```java
+@SpringBootApplication
+public class StreamConsumer8802 {
+    public static void main(String[] args) {
+        SpringApplication.run(StreamConsumer8802.class,args);
+    }
+}
+```
+测试启动 7001 rabbitmq 8801 8802 访问http://localhost:8801/sendMessage 8802和8801控制台有输出一样即可
+创建一个8803消费者和8802一模一样
+目前是8802/8803同时都收到了，存在重复消费问题
+  比如在如下场景中，订单系统我们做集群部署，都会从RabbitMQ中获取订单信息，
+  那如果一个订单同时被两个服务获取到，那么就会造成数据错误，我们得避免这种情况。
+  这时我们就可以使用Stream中的消息分组来解决
+    
+  注意在Stream中处于同一个group中的多个消费者是竞争关系，就能够保证消息只会被其中一个应用消费一次。
+  不同组是可以全面消费的(重复消费)，同一组内会发生竞争关系，只有其中一个可以消费。
+stream会默认分组，每个都分一次，所有存在重复消费
+原理：微服务应用放置于同一个group中，就能够保证消息只会被其中一个应用消费一次。不同的组是可以消费的，同一个组内会发生竞争关系，只有其中一个可以消费。
+***自定义组：***
+  8802/8803都变成不同组，group两个不同
+  在8802 8803 下面分别写创建组cyzA,cyzB
+```yaml
+bindings: #服务的整合处理
+        input: #这个名字是一个通道的名称
+          destination: studyExchange #表示要使用的Exchange名称定义
+          content-type: application/json #设置消息类型，本次为json，文本则设置"text/plain"
+          binder: defaultRabbit #设置要绑定的消息服务的具体设置
+          group: cyzA 用于自定义分组
+```
+  8802/8803实现了轮询分组，每次只有一个消费者
+  8801模块的发的消息只能被8802或8803其中一个接收到，这样避免了重复消费。
+  在8802 8803 下面分别写创建相同组cyzA
+***持久化***
+把8802中的group去掉，停掉8802 8803 发送请求，启动8802 8803 ，发现8802没有消费未消费的信息 8803启动后就消费
+##分布式请求链式跟踪
+spring cloud sleuth
+为什么有它：在微服务框架中，一个由客户端发起的请求在后端系统中会经过多个不同的的服务节点调用来协同产生最后的请求结果，每一个前段请求都会形成一条复杂的分布式服务调用链路，链路中的任何一环出现高延时或错误都会引起整个请求最后的失败。
+
+Spring Cloud Sleuth提供了一套完整的服务跟踪的解决方案在分布式系统中提供追踪解决方案并且兼容支持了zipkin
+
+下载zipkin-server.jar :https://search.maven.org/remote_content?g=io.zipkin.java&a=zipkin-server&v=LATEST&c=exec
+
+执行java -jar zipkin-server-2.12.9-exec.jar  后 http://localhost:9411/zipkin/
+使用：使用原先的consumer80和provider8001
+在两个里面添加依赖
+```XML
+   <!--引入zipkin-->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-zipkin</artifactId>
+        </dependency>
+```
+加配置：
+```yaml
+spring:
+  application:
+    name: cloud-payment-consumer
+  zipkin:
+    base-url: http://localhost:9411
+    sleuth:
+      sampler:
+        #采样率值介于0到1之间 1表示100%
+        probability: 1
+```
+测试 启动7001 zipkin 8001 80 多访问几次，打开zipkin界面，可以看懂啊调用信息
 #spring cloud Alibaba
