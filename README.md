@@ -1,5 +1,6 @@
 # myspringcloud
 个人学习springcloud代码
+git上克隆下来会没有maven支持，可以右击项目名add framework support 选择maven即可
 
 | 功能     | 框架                                |
 | ------ | --------------------------------- |
