@@ -1421,3 +1421,349 @@ spring:
 ```
 测试 启动7001 zipkin 8001 80 多访问几次，打开zipkin界面，可以看懂啊调用信息
 #spring cloud Alibaba
+进入维护模式意味着
+Spring Cloud Netflix将不再开发新的组件
+我们都知道Spring Cloud版本迭代算是比较快的，因而出现了很多重大ISSUE都还来不及Fix就又推另一个Release了。
+进入维护模式意思就是目前一直以后一段时间Spring Cloud Netflix提供的服务和功能就这么多了，不在开发新的组件和功能了。
+以后将以维护和Merge分支Full Request为主
+
+延生:
+2018.10.31，Spring Cloud Alibaba正式入驻了 Spring Cloud官方孵化器，并在Maven中央库发布了第一个版本。
+
+服务限流降级:默认支持Servlet、Feign、RestTemplate、Dubbo和RocketMQ限流降级功能的接入，可以在运行时通过控制台实时修改限流降级规则，还支持查看限流降级 Metrics 监控。
+服务注册与发现:适配 Spring Cloud服务注册与发现标准，默认集成了 Ribbon的支持。
+分布式配置管理:支持分布式系统中的外部化配置，配置更改时自动刷新。
+消息驱动能力:基于Spring Cloud Stream为微服务应用构建消息驱动能力。
+阿里云对象存储:阿里云提供的海量、安全、低成本、高可靠的云存储服务。支持在任何应用、任何时间、任何地点存储和访问任意类型的数据。
+分布式任务调度:提供秒级、精准、高可靠、高可用的定时 (基于Cron表达式)任务调度服务。同时提供分布式的任务执行模型，如网格任务。网格任务支持海量子任务均匀分配到所有Worker (schedulerx-client)上执行。
+框架： 
+  Sentinel
+    阿里巴巴开源产品，把流量作为切入点，从流量控制、熔断降级、系统负载保护等多个维度保护服务的稳定性。
+  Nacos
+    阿里巴巴开源产品，一个更易于构建云原生应用的动态服务发现、配置管理和服务管理平台。
+  RocketMQ
+    Apache RocketMQTM基于Java的高性能、高吞吐量的分布式消息和流计算平台。
+  Dubbo
+    Apache DubboM是一款高性能Java RPC框架。
+  Seata
+    阿里巴巴开源产品，一个易于使用的高性能微服务分布式事务解决方案。
+  Alibaba Cloud oss
+    阿里云对象存储服务（Object Storage Service，简称OSS)，是阿里云提供的海量、安全、低成本、高可靠的云存储服务。您可以在痤何应用、任何时间、任何地点存储和访问任意类型的数据。
+  Alibaba Cloud SchedulerX
+    阿里中间件团队开发的一款分布式任务调度产品，支持周期性的任务与固定时间点触发任务。
+##nacos
+Nacos = Eureka+Config +Bus
+Nacos支持AP和CP模式的切换
+C是所有节点在同一时间看到的数据是一致的;而A的定义是所有的请求都会收到响应。
+何时选择使用何种模式?
+一般来说，
+如果不需要存储服务级别的信息且服务实例是通过nacos-client注册，并能够保持心跳上报，那么就可以选择AP模式。
+当前主流的服务如 Spring cloud 和Dubo服务，都适用于AP模式，AP模式为了服务的可能性而减弱了一致性，因此AP模式下只支持注册临时实例。
+
+如果需要在服务级别编辑或者存储配置信息，那么CP是必须，K8S服务和DNS服务则适用于CP模式。
+CP模式下则支持注册持久化实例，此时则是以Raft 协议为集群运行模式，该模式下注册实例之前必须先注册服务，如果服务不存在，则会返回错误。
+curl -X PUT '$NACOS_SERVER:8848/nacos/v1/ns/operator/switches?entry=serverMode&value=CP'
+
+###安装nacos
+
+去官网下载:https://github.com/alibaba/nacos/releases
+下载windows版本 解压到文件夹，默认是集群启动，要修改startup.cmd修改为单点
+```shell
+set MODE="cluster" #集群
+set MODE="standalone" #单点
+```
+双击startup.cmd 启动后在浏览器输入localhost:8848/nacos 出现可视化界面即成功 用户名和密码都是nacos
+###使用
+####作为服务注册与发现中心
+创建两个一模一样的提供者 
+cloudalibaba-provider-payment9001 
+cloudalibaba-provider-payment9001
+pom：
+```xml
+    <dependencies>
+        <dependency>
+            <groupId>com.alibaba.cloud</groupId>
+            <artifactId>spring-cloud-alibaba-nacos-discovery</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+    </dependencies>
+```
+配置：
+```yaml
+server:
+  port: 9001
+
+spring:
+  application:
+    name: nacos-payment-provider
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8848  #配置nacos地址
+#暴露监控接口
+management:
+  endpoints:
+    web:
+      exposure:
+        include: '*'
+```
+启动类
+```java
+@SpringBootApplication
+@EnableDiscoveryClient
+public class Application9001 {
+    public static void main(String[] args) {
+        SpringApplication.run(Application9001.class,args);
+    }
+}
+
+```
+controller:
+```java
+@RestController
+public class PaymentController {
+
+
+    @GetMapping("/get")
+    public String get(){
+        return "controller:9001";
+    }
+}
+
+```
+创建消费者 cloudalibaba-consumer-nacos-order83
+pom：
+```xml
+    <dependencies>
+        <dependency>
+            <groupId>com.alibaba.cloud</groupId>
+            <artifactId>spring-cloud-alibaba-nacos-discovery</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+    </dependencies>
+   ```
+配置：
+```yaml
+server:
+  port: 83
+
+spring:
+  application:
+    name: nacos-order-consumer
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8848  #配置nacos地址
+
+#消费者将要去访问的服务名称 自己写的配置，用@value取值
+service-url:
+  nacos-user-service: http://nacos-payment-provider
+##暴露监控接口,消费者不需要被别人引用，所以不需要下面这个
+#management:
+#  endpoints:
+#    web:
+#      exposure:
+#        include: '*'
+```
+配置resttemplate
+```java
+@Configuration
+public class ApplicationConfig {
+
+    @Bean
+    @LoadBalanced
+    public RestTemplate getTemplate(){
+        return new RestTemplate();
+    }
+}
+
+```
+controller:
+```java
+@RestController
+public class OrderNacosController {
+    @Autowired
+    private RestTemplate restTemplate;
+   //读取配置文件里的配置
+    @Value("${service-url.nacos-user-service}")
+    private String RestUrl;
+    @GetMapping("/get")
+    public String get(){
+        return restTemplate.getForObject(RestUrl+"/get",String.class);
+    }
+}
+```
+启动类
+```java
+@SpringBootApplication
+@EnableDiscoveryClient
+public class Application83 {
+    public static void main(String[] args) {
+        SpringApplication.run(Application83.class,args);
+    }
+}
+```
+####作为服务配置中心
+Nacos同springcloud-config一样，在项目初始化时，要保证先从配置中心进行配置拉取，拉取配置之后，才能保证项目的正常启动。
+springboot中配置文件的加载是存在优先级顺序的,bootstrap优先级高于application
+实例：
+创建cloudalibaba-config-nacos-client3377
+pom：
+```xml
+<dependencies>
+        <dependency>
+            <groupId>com.alibaba.cloud</groupId>
+            <artifactId>spring-cloud-alibaba-nacos-discovery</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.alibaba.cloud</groupId>
+            <artifactId>spring-cloud-starter-alibaba-nacos-config</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+    </dependencies>
+```
+bootstrap:
+```yml
+server:
+  port: 3377
+
+spring:
+  application:
+    name: nacos-config
+  cloud:
+    nacos:
+      config:
+        server-addr: localhost:8848  #配置nacos地址
+        file-extension: yaml #配置文件拓展名
+        namespace: dev  #配置命名空间 默认是public
+        prefix: nacos-config1 #配置文件名 默认是spring.application.name
+        group: TEST_GROUP         #组名 默认是DEFAULT_GROUP
+      discovery:
+        server-addr: localhost:8848  #配置nacos地址
+
+#Nacos Config加载配置时，也会加载DataId为${spring.application.name}.${file-extension:properties}，
+#DataId为的基础配置${spring.application.name}-${profile}.${file-extension:properties}。
+#application.yml中配置了profile则加上profile，没有配置的话就是空
+#配置了profile  spring.profiles.active: dev
+#  获取的默认文件是nacos-config1-dev.yaml 在对应的namespace下面
+#没有配置的话nacos-config1.yaml  也可以修改名字不是spring.application.name，使用spring.cloud.nacos.config.prefix = aa即可
+#则取aa.yaml文件
+```
+application:
+```yml
+spring:
+  profiles:
+    active: dev #表示开发环境
+```
+controller:
+```java
+
+package com.cyz.controller;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * @author cyz
+ * @date 2021/8/8 0008 13:55
+ */
+@RestController
+@RefreshScope//动态刷新
+public class PaymentController {
+
+
+    @Value("${student.name}")
+    private String name;
+    @Value("${student.age}")
+    private Integer age;
+
+    @GetMapping("/config")
+    public String get(){
+        return "name:"+name+",age:"+age;
+    }
+}
+
+```
+启动类
+```java
+@SpringBootApplication
+@EnableDiscoveryClient
+public class Application3377 {
+    public static void main(String[] args) {
+        SpringApplication.run(Application3377.class,args);
+    }
+}
+```
+集群：
+默认Nacos使用嵌入式数据库实现数据的存储。所以，如果启动多个默认配置下的Nacos节点，数据存储是存在一致性问题的。
+为了解决这个问题，Nacos采用了集中式存储的方式来支持集群化部署，目前只支持MySQL的存储。
+
+Nacos支持三种部署模式
+- 单机模式-用于测试和单机试用。
+- 集群模式–用于生产环境，确保高可用。 
+- 多集群模式–用于多数据中心场景。
+Windows
+cmd startup.cmd或者双击startup.cmd文件
+nacos刚开始会使用内嵌数据库，一般集群需要使用mysql，修改如下
+修改application.properties，添加配置
+```yaml
+#*************** Config Module Related Configurations ***************#
+### If use MySQL as datasource:
+spring.datasource.platform=mysql
+
+### Count of DB:
+db.num=1
+
+### Connect URL of DB:
+db.url.0=jdbc:mysql://127.0.0.1:3306/nacos?characterEncoding=utf8&connectTimeout=1000&socketTimeout=3000&autoReconnect=true&useUnicode=true&useSSL=false&serverTimezone=UTC
+db.user.0=root
+db.password.0=123456
+```
+重新启动nacos即可
+window集群
+本次搭建的nacos集群的端口分别为8848,8849,8850
+前面的IP地址为你自己本地的IP地址，这里最好不要写成localhost或127.0.0.1，否则集群可能会搭建失败
+进入nacos下的conf目录下将cluster.conf.example重命名为cluster.conf然后打开该文件添加以下内容
+修改host文件添加nacos8848.com为ip
+```shell
+#2021-08-08T16:54:50.276
+192.168.87.1:8848
+nacos8848.com:8848
+nacos8848.com:8849
+nacos8848.com:8850
+```
+修改startup.cmd为集群模式
+set MODE="cluster"
+#set MODE="standalone"
+将该nacos目录复制两份名字随意起，然后将复制过去的nacos目录下的conf下的application.properties文件中
+的server.port分别改成8849，8850
+分别启动这三个nacos，到bin下点击startup.cmd即可启动
+打开浏览器访问http://localhost:8848/nacos OK

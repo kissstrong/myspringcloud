@@ -1,0 +1,24 @@
+server:
+  port: 3377
+
+spring:
+  application:
+    name: nacos-config
+  cloud:
+    nacos:
+      config:
+        server-addr: localhost:8848  #配置nacos地址
+        file-extension: yaml #配置文件拓展名
+        namespace: dev  #配置命名空间 默认是public
+        prefix: nacos-config1 #配置文件名 默认是spring.application.name
+        group: TEST_GROUP         #组名 默认是DEFAULT_GROUP
+      discovery:
+        server-addr: localhost:8848  #配置nacos地址
+
+#Nacos Config加载配置时，也会加载DataId为${spring.application.name}.${file-extension:properties}，
+#DataId为的基础配置${spring.application.name}-${profile}.${file-extension:properties}。
+#application.yml中配置了profile则加上profile，没有配置的话就是空
+#配置了profile  spring.profiles.active: dev
+#  获取的默认文件是nacos-config1-dev.yaml 在对应的namespace下面
+#没有配置的话nacos-config1.yaml  也可以修改名字不是spring.application.name，使用spring.cloud.nacos.config.prefix = aa即可
+#则取aa.yaml文件

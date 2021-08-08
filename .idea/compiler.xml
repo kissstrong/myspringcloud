@@ -7,6 +7,7 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
+        <module name="cloudalibaba-config-nacos-client3377" />
         <module name="cloud-provider-payment8002" />
         <module name="cloud-eureka-server7001" />
         <module name="cloud-api-commons" />
@@ -20,8 +21,11 @@
         <module name="cloud-stream-rabbitmq-consumer8803" />
         <module name="cloud-config-center-3344" />
         <module name="cloud" />
+        <module name="cloudalibaba-provider-payment9002" />
         <module name="cloud-peovider-hystrix-payment8001" />
+        <module name="cloudalibaba-provider-payment9001" />
         <module name="cloud-gateway-gateway9527" />
+        <module name="cloudalibaba-consumer-nacos-order83" />
         <module name="cloud-consumer-order80" />
         <module name="cloud-provider-payment8006" />
         <module name="cloud-config-client-3355" />
@@ -51,6 +55,10 @@
       <module name="cloud-stream-rabbitmq-consumer8802" target="8" />
       <module name="cloud-stream-rabbitmq-consumer8803" target="8" />
       <module name="cloud-stream-rabbitmq-provider8801" target="8" />
+      <module name="cloudalibaba-config-nacos-client3377" target="8" />
+      <module name="cloudalibaba-consumer-nacos-order83" target="8" />
+      <module name="cloudalibaba-provider-payment9001" target="8" />
+      <module name="cloudalibaba-provider-payment9002" target="8" />
       <module name="myspringcloud" target="1.5" />
     </bytecodeTargetLevel>
   </component>
