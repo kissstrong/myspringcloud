@@ -1,0 +1,20 @@
+server:
+  port: 83
+
+spring:
+  application:
+    name: nacos-order-consumer
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8848  #配置nacos地址
+
+#消费者将要去访问的服务名称 自己写的配置，用@value取值
+service-url:
+  nacos-user-service: http://nacos-payment-provider
+##暴露监控接口,消费者不需要被别人引用，所以不需要下面这个
+#management:
+#  endpoints:
+#    web:
+#      exposure:
+#        include: '*'
