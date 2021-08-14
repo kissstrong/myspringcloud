@@ -1767,3 +1767,297 @@ set MODE="cluster"
 的server.port分别改成8849，8850
 分别启动这三个nacos，到bin下点击startup.cmd即可启动
 打开浏览器访问http://localhost:8848/nacos OK
+##sentinel
+
+***是什么***
+随着微服务的流行，服务和服务之间的稳定性变得越来越重要。Sentinel以流星为切入点，从流量控制、熔断降级、系统负载保护等多个维度保护服务的稳定性。
+Sentinel具有以下特征:
+- 丰富的应用场景: Sentinel承接了阿里巴巴近10年的双十一大促流量的核心场景，例如秒杀(即突发流量控制在系统容量可以承受的范围)、消息削峰填谷、集群流星控制、实时熔断下游不可用应用等。
+- 完备的实时监控: Sentinel同时提供实时的监控功能。您可以在控制台中看到接入应用的单台机器秒级数据，甚至500台以下规模的集群的汇总运行情况。
+- 广泛的开源生态: Sentinel提供开箱即用的与其它开源框架/库的整合模块，例如与Spring Cloud、Dubbo、gRPC的整合。您只需要引入相应的依赖并进行简单的配置即可快速地接入Sentinel。 
+- 完善的SPI扩展点: Sentinel提供简单易用、完善的SPI扩展接口。您可以通过实现扩展接口来快速地定制逻辑。例如定制规则管理、适配动态数据源等。
+
+Hystrix
+1需要我们程序员自己手工搭建监控平台
+2没有一套web界面可以给我们进行更加细粒度化得配置流控、速率控制、服务熔断、服务降级。。。。。.
+Sentinel
+1单独一个组件，可以独立出来。
+2直接界面化的细粒度统一配置。
+###使用：
+创建cloudalibaba-sentinel-service8401
+导入依赖：
+```xml
+    <dependencies>
+        <dependency>
+            <groupId>com.alibaba.cloud</groupId>
+            <artifactId>spring-cloud-alibaba-nacos-discovery</artifactId>
+        </dependency>
+        <!--后续做持久化用到-->
+        <dependency>
+            <groupId>com.alibaba.csp</groupId>
+            <artifactId>sentinel-datasource-nacos</artifactId>
+        </dependency>
+        <!--sentinel-->
+        <dependency>
+            <groupId>com.alibaba.cloud</groupId>
+            <artifactId>spring-cloud-starter-alibaba-sentinel</artifactId>
+        </dependency>
+        <!--openfeign-->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-openfeign</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+    </dependencies>
+```
+配置：
+```yaml
+server:
+  port: 8401
+
+spring:
+  application:
+    name: cloudalibaba-sentinel-service
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8848  #配置nacos地址
+    sentinel:
+      transport:
+        #认8719端口，假如被占用会自动从8719开始依次+1扫描,直至找到未被占用的端口
+        port: 8719
+        dashboard: localhost:8080 #配置sentinel地址
+
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: '*'
+
+```
+启动类：
+```java
+@EnableDiscoveryClient
+@SpringBootApplication
+public class ApplicationSentinel8401 {
+    public static void main(String[] args) {
+        SpringApplication.run(ApplicationSentinel8401.class,args);
+    }
+}
+
+```
+
+controller:
+```java
+@RestController
+public class SentinelController {
+    @GetMapping("/testA")
+    public String testA(){
+        return  "testA";
+    }
+
+    @GetMapping("/testB")
+    public String testB(){
+        return  "testB";
+    }
+
+}
+
+```
+测试：开启nacos 开启sentinel 启动服务=》 启动后nacos上有该服务，sentinel没有，访问一下controller里面的请求
+刷新sentinel即有显示
+
+###流控规则
+####基本介绍
+- 资源名:唯一名称，默认请求路径
+- 针对来源: Sentinel可以针对调用者进行限流，填写微服务名，默认default(不区分来源)。 
+  阈值类型/单机阈值:
+  QPS(每秒钟的请求数量)︰当调用该api的QPS达到阈值的时候，进行限流。
+  线程数:当调用该api的线程数达到阈值的时候，进行限流
+- 是否集群:不需要集群·流控模式:
+- 直接: api达到限流条件时，直接限流
+- 关联:当关联的资源达到阈值时，就限流自己
+- 链路:只记录指定链路上的流量（指定资源从入口资源进来的流量，如果达到阈值，就进行限流)【api级别的针对来源】
+
+流控效果:
+- 快速失败:直接失败，抛异常
+- Warm Up:根据codeFactor(冷加载因子，默认3)的值，从阈值/codeFactor，经过预热时长.才达到设置的QPS阈值
+- 排队等待:匀速排队，让请求以匀速的速度通过，阈值类型必须设置为QPS，否则无效
+
+####流控模式
+直接(默认)：
+  直接->快速失败
+  配置及说明测试
+关联：
+是什么：当关联的资源达到阈值时，就限流自己当与A关联的资源B达到阀值后，就限流A自己 => B惹事，A挂了
+在testA里面关联testB  使用postman集合测试（新建一个集合，正常访问http://localhost:8401/testB 保存到刚刚新建的集合）
+开启集合测试，访问testA A挂了
+####流控效果
+直接->快速失败(默认的流控处理)
+预热 公式:阈值除以coldFactor(默认值为3),经过预热时长后才会达到阈值
+      默认coldFactor为3，即请求QPS从(threshold / 3)开始，经多少预热时长才逐渐升至设定的QPS阈值。案例，阀值为10+预热时长设置5秒。
+      系统初始化的阀值为10/3约等于3,即阀值刚开始为3;然后过了5秒后阀值才慢慢升高恢复到10
+
+排队等待：匀速排队（ RuleConstant.CONTROL_BEHAVIOR_RATE__IMITER）方式会严格控制请求通过的间隔时间，也即是让请求以均匀的速度通过，对应的是漏桶算法。
+详细文档可以参考流量控制-匀速器模式，具体的例子可以参见PaceFlowDemo。
+这种方式主要用于处理间隔性突发的流量，例如消息队列。想象一下这样的场景，在某一秒有大量的请求到来，而接下来的几秒则处于空闲状态，我们希望系统能够在接下来的空闲期间逐渐处理这些请求，.而不是在第一秒真接拒绝多余的请求。
+
+
+
+
+###降级规则
+####基本介绍
+RT(平均响应时间，秒级)
+  平均响应时间超出阈值且在时间窗口内通过的请求>=5，两个条件同时满足后触发降级窗口期过后关闭断路器
+  RT最大4900(更大的需要通过-Dcsp.sentinel.statistic.max.rt=XXXX才能生效)
+异常比列(秒级)
+  QPS >= 5且异常比例（秒级统计)超过阈值时，触发降级;时间窗口结束后，关闭降级
+异常数(分钟级)
+  异常数(分钟统计）超过阈值时，触发降级;射间窗口结束后，关闭降级
+
+Sentinel 熔断降级会在调用链路中某个资源出现不稳定状态时（例如调用超时或异常比例升高)，对这个资源的调用进行限制，让请求快速失败，避免影响到其它的资源而导致级联错误。
+当资源被降级后，在接下来的降级时间窗口之内，对该资源的调用都自动熔断(默认行为是抛出 DegradeException)。
+
+Sentinei的断路器是没有半开状态的
+####降级策略实战
+RT
+异常比例
+异常数
+####热点key限流
+  参数例外项很重要：有要求限流，但值为某个值时不限流
+```java
+ @GetMapping("/hotKey")
+    //value一般使用请求名  blockHandler类似于兜底方法
+    @SentinelResource(value = "hotKey",blockHandler = "deal_hotKey")
+    public String hotKey(@RequestParam(value = "p1",required = false) String p1,
+                         @RequestParam(value = "p2",required = false)String p2){
+
+        return  "hotKey";
+    }
+
+    public String deal_hotKey(String p1, String p2 , BlockException e){
+        return  "deal_hotKey"; // sentinel系统默认的提示: BLocked by sentinel (fLow limiting)
+
+    }
+```
+注意：
+@SentinelResource
+处理的是sentinel控制台配置的违规情况，有blockHandler方法配置的兜底处理;
+RuntimeException
+int age = 10/0,这个是java运行时报出的运行时异常RunTimeException，@SentinelResource不管
+总结
+@sentinelResource主管配置出错，运行出错该走异常走异常
+
+####系统限流规则
+系统级别的限流
+系统保护规则是从应用级别的入口流量进行控制，从单台机器的 load、CPU使用率、平均RT、入口QPS和并发线程数等几个维度监控应用指标，让系统尽可能跑在最大吞吐量的同时保证系统整体的稳定性。
+系统保护规则是应用整体维度的，而不是资源维度的，并且仅对入口流量生效。入口流量指的是进入应用的流星（ EntryType.IN )，比如Web服务或Dubbo服务端接收的请求，都属于入口流量。系统规则支持以下的模式:
+- Load自适应（仅对Linux/Unix-like机器生效):系统的 load1作为启发指标，进行自适应系统
+保护。当系统load1超过设定的启发值，且系统当前的并发线程数超过估算的系统容量时才会触发系统保护（BBR阶段)。系统容星由系统的 maxQps *minRt估算得出。设定参考值一般是CPu cores* 2.5。 
+- CPU usage (1.5.0+版本)︰当系统CPU使用率超过阈值即触发系统保护（取值范围0.0-1.0) ， 比较灵敏。
+平均RT:当单台机器上所有入口流量的平均RT达到阈值即触发系统保护，单位是毫秒。
+- 并发线程数:当单台机器上所有入口流量的并发线程数达到阈值即触发系统保护。
+- 入口QPS:当单台机器上所有入口流是的QPS达到阈值即触发系统保护。
+####@sentinelResource
+```java
+@RestController
+public class RateLimitController {
+
+    @GetMapping("/byResource")
+    //value一般使用请求名有了value 资源名也可以写value  blockHandler 处理限流兜底
+    @SentinelResource(value = "byResource",blockHandler = "deal_byResource")
+    public String byResource(){
+        return  "byResource";
+    }
+
+    public String deal_byResource(BlockException e){
+        return  "deal_byResource"; // sentinel系统默认的提示: BLocked by sentinel (fLow limiting)
+
+    }
+
+//没有处理方法就是默认的
+    @GetMapping("rateLimit/byUrl")
+    //value一般使用请求名有了value
+    @SentinelResource(value = "byUrl")
+    public String byUrl(){
+        return  "byUrl";
+    }
+
+
+    @GetMapping("globalHandler")
+    //value一般使用请求名有了value
+    @SentinelResource(value = "globalHandler",blockHandlerClass = GlobalHandler.class,blockHandler = "handler1")
+    public String globalHandler(){
+        return  "globalHandler";
+    }
+
+
+}
+
+```
+
+```java
+public class GlobalHandler {
+//一定要使用static修饰，不然访问不到
+    public static String handler1(BlockException e){
+        return  "handler1";
+    }
+
+    public static String handler2(BlockException e){
+        return  "handler2";
+    }
+}
+
+```
+####服务熔断
+
+sentinel整合ribbon+openFeign+fallback
+Ribbon系列
+Feign系列
+熔断框架比较
+新建9003 9004 服务 84消费
+
+ribbon系列：
+```java
+@RestController
+public class OrderNacosController {
+    @Autowired
+    private RestTemplate restTemplate;
+    private String RestUrl = "http://nacos-payment-provider";
+    @GetMapping("/get")
+    //@SentinelResource(value = "get")//什么都没有配置
+    //@SentinelResource(value = "get",fallback = "deal_fallback")//配置了fallback
+    //@SentinelResource(value = "get",blockHandler = "deal_blockHandler")//配置了blockHandler
+    //两个都配置的时候但错误情况下又限流报错则返回限流
+    @SentinelResource(value = "get",blockHandler = "deal_blockHandler",fallback = "deal_fallback")//配置了fallback和blockHandler
+    public String get(String id){
+        if (id.equals("1")){
+            throw   new RuntimeException("参数错误");
+        }
+        return restTemplate.getForObject(RestUrl+"/get",String.class);
+    }
+
+    public String deal_fallback(String id){
+        return "我是报错的兜底方法,id="+id;
+    }
+    public  String deal_blockHandler(String id,BlockException e){
+        return "我是流量监控兜底方法";
+    }
+
+}
+
+```
+feign系列都差不多
+##seate
+分布式事务
+
+
