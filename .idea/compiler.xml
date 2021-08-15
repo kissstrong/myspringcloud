@@ -68,6 +68,8 @@
       <module name="cloudalibaba-provider-payment9004" target="8" />
       <module name="cloudalibaba-sentinel-service8401" target="8" />
       <module name="myspringcloud" target="1.5" />
+      <module name="seata-order-service2001" target="8" />
+      <module name="seata-storage-service2002" target="8" />
     </bytecodeTargetLevel>
   </component>
 </project>
